@@ -6,9 +6,9 @@ from sklearn.model_selection import train_test_split, KFold
 from sklearn.naive_bayes import GaussianNB
 from sklearn.preprocessing import StandardScaler  # scipy package
 from sklearn.metrics import accuracy_score
-from sklearn import cross_validation
-#from sklearn import svm
-
+from sklearn import cross_validation, neighbors
+from sklearn import svm
+import pickle
 
 class IntrusionDetector:
 
@@ -156,6 +156,8 @@ class IntrusionDetector:
         model = GaussianNB()
         # Train the model using the training sets
         model.fit(self.kdd_train_data[:, :-1], self.kdd_train_data[:, -1])
+        with open('naivebayes.pickle','wb') as f:
+            pickle.dump(model,f)
 
         # Predict
         predicts = model.predict(self.kdd_test_data[:, :-1])
@@ -170,17 +172,24 @@ class IntrusionDetector:
         return (accuracy_score(self.kdd_test_data[:, -1], predicts))
         '''
 
-    def post_classification(self):
-        # model=RandomForestClassifier(n_estimators=100)
-        # cv=cross_validation.KFold(len(self.kdd_train_data),n_folds=10, indices=False)
+    def knearestneighbor(self):
+        print('in knn')
+        self.kdd_data_reduced=np.concatenate([self.kdd_data_reduced, self.get_2classes_labels()], axis=1)
+        self.kdd_train_data, self.kdd_test_data = train_test_split(self.kdd_data_reduced, test_size=0.2)
+        clf=neighbors.KNeighborsClassifier()
+        clf.fit(self.kdd_train_data)
+        print('model trained')
+        predicts = clf.predict(self.kdd_test_data[:, :-1])
+        accuracy=accuracy_score(self.kdd_test_data[:, -1], predicts)
+        print('knn accuracy',accuracy)
 
-        kf=KFold(n_splits=5)
-        result=[]
+    # def post_classification(self):
+    #     #print(len(self.kdd_train_data),len(self.kdd_test_data))
+    #     # X_train, X_test, y_train, y_test =cross_validation.train_test_split(self.kdd_train_data,self.kdd_test_data,test_size=0.2)
+    #     # #self.model.fit(self.kdd_train_data,self.kdd_test_data)
+    #     # accuracy=self.model.score(X_test,y_test)
+    #     # print("Post Classification: "+accuracy)
 
-        for traincv, testcv in cv:
-            probabs=model.fit(train[traincv], target[traincv]).predict_proba(train[testcv])
-            result.append(Error_Function)
-        print("Results: "+str(np.array(results).mean()))
 
 
 
@@ -194,10 +203,11 @@ def main():
     i_detector.preprocessor()
 
     i_detector.feature_reduction_PCA()
-    accuracy = i_detector.classify()
-    print("accuracy of classifying 20% test-data is : ")
-    print(accuracy)
-    i_detector.post_classification()
+    i_detector.knearestneighbor()
+    # accuracy = i_detector.classify()
+    # print("accuracy of classifying 20% test-data is : ")
+    # print(accuracy)
+    #i_detector.post_classification()
 
 if __name__ == '__main__':
     main()
