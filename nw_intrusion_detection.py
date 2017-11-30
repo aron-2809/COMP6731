@@ -10,6 +10,7 @@ from sklearn import cross_validation, neighbors
 from sklearn.metrics import confusion_matrix
 from sklearn import svm
 from sklearn import tree
+from sklearn.model_selection import cross_val_score
 import pickle
 
 class IntrusionDetector:
@@ -133,11 +134,14 @@ class IntrusionDetector:
         # shuffle is by default = True
         kdd_train_data, kdd_test_data = train_test_split(data, train_size=0.8)
 
-        model = GaussianNB()
+         #Load classifier from Pickle
+        model=pickle.load(open("naivebayes.pickle", "rb"))
+
+        # model = GaussianNB()
         # Train the model using the training sets
-        model.fit(kdd_train_data[:, :-1], kdd_train_data[:, -1])
-        with open('naivebayes.pickle','wb') as f:
-            pickle.dump(model,f)
+        # model.fit(kdd_train_data[:, :-1], kdd_train_data[:, -1])
+        # with open('naivebayes.pickle','wb') as f:
+        #     pickle.dump(model,f)
 
         # Predict
         predicts = model.predict(kdd_test_data[:, :-1])
@@ -147,12 +151,15 @@ class IntrusionDetector:
         con_matrix = confusion_matrix(kdd_test_data[:, -1], predicts, labels=["normal.", "attack."])
         print("confusion matrix:")
         print(con_matrix)
+        scores=cross_val_score(model,kdd_train_data[:, :-1], kdd_train_data[:, -1],cv=5)
+        print('Cross validation Score:',scores)
 
 
     def knn_classifier(self):
         data = np.concatenate([self.kdd_numeric, self.kdd_label_2classes], axis=1)
         kdd_train_data, kdd_test_data = train_test_split(data, test_size=0.2)
 
+        #Load classifier from Pickle
         clf=pickle.load(open("knearestneighbor.pickle", "rb"))
         # clf = neighbors.KNeighborsClassifier()
         # clf.fit(kdd_train_data[:, :-1], kdd_train_data[:, -1])
@@ -162,18 +169,17 @@ class IntrusionDetector:
         predicts = clf.predict(kdd_test_data[:, :-1])
         accuracy=accuracy_score(kdd_test_data[:, -1], predicts)
         print('knn accuracy',accuracy)
+        scores=cross_val_score(clf, kdd_train_data[:, :-1], kdd_train_data[:, -1],cv=5)
+        print('Cross validation Score:',scores)
 
     def svm_classifier(self):
         data = np.concatenate([self.kdd_numeric, self.kdd_label_2classes], axis=1)
         kdd_train_data, kdd_test_data = train_test_split(data, train_size=0.1)
 
-        #load Pickle
-        model=pickle.load(open("svm.pickle", "rb"))
         # Create SVM classification object
-        # model = svm.SVC(kernel='rbf', C=0.2, gamma=1)
-        # model.fit(kdd_train_data[:, :-1], kdd_train_data[:, -1])
-        # with open('svm.pickle','wb') as f:
-        #     pickle.dump(model,f)
+        model = svm.SVC(kernel='rbf', C=0.2, gamma=1)
+        model.fit(kdd_train_data[:, :-1], kdd_train_data[:, -1])
+
         # Predict Output
         predicts = model.predict(kdd_test_data[:, :-1])
         print("SVM classifier:")
@@ -182,6 +188,8 @@ class IntrusionDetector:
         con_matrix = confusion_matrix(kdd_test_data[:, -1], predicts, labels=["normal.", "attack."])
         print("confusion matrix:")
         print(con_matrix)
+        scores=cross_val_score(model,kdd_train_data[:, :-1], kdd_train_data[:, -1],cv=5)
+        print('Cross validation Score:',scores)
 
 
     def decision_tree_classifier(self):
@@ -189,12 +197,8 @@ class IntrusionDetector:
 
         kdd_train_data, kdd_test_data = train_test_split(data, train_size=0.8)
 
-        #load Pickle
-        model=pickle.load(open("svm.pickle", "rb"))
-        # model = tree.DecisionTreeClassifier()
-        # model.fit(kdd_train_data[:, :-1], kdd_train_data[:, -1])
-        # with open('decision_tree.pickle','wb') as f:
-        #      pickle.dump(model,f)
+        model = tree.DecisionTreeClassifier()
+        model.fit(kdd_train_data[:, :-1], kdd_train_data[:, -1])
         predicts = model.predict(kdd_test_data[:, :-1])
         print("Decision Tree classifier:")
         accuracy = accuracy_score(kdd_test_data[:, -1], predicts)
@@ -202,6 +206,8 @@ class IntrusionDetector:
         con_matrix = confusion_matrix(kdd_test_data[:, -1], predicts, labels=["normal.", "attack."])
         print("confusion matrix:")
         print(con_matrix)
+        scores=cross_val_score(model,kdd_train_data[:, :-1], kdd_train_data[:, -1],cv=5)
+        print('Cross validation Score:',scores)
 
 
 def main():
@@ -213,10 +219,10 @@ def main():
     i_detector.preprocessor()
 
     i_detector.feature_reduction_PCA()
-    #i_detector.bayes_classifier()
+    i_detector.bayes_classifier()
     # i_detector.knn_classifier()
-    # i_detector.svm_classifier()
-    i_detector.decision_tree_classifier()
+    #i_detector.svm_classifier()
+    # i_detector.decision_tree_classifier()
 
 if __name__ == '__main__':
     main()
