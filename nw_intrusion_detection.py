@@ -2,9 +2,9 @@ import pandas as pd
 import numpy as np
 from time import time
 import os
-from sklearn.model_selection import train_test_split, KFold
+from sklearn.model_selection import train_test_split, cross_val_score
 from sklearn.naive_bayes import GaussianNB
-from sklearn.preprocessing import StandardScaler  # scipy package
+from sklearn.preprocessing import StandardScaler  # install scipy package
 from sklearn.metrics import accuracy_score
 from sklearn import cross_validation, neighbors
 from sklearn.metrics import confusion_matrix
@@ -17,11 +17,14 @@ class IntrusionDetector:
     def __init__(self, data_path):
         self.kdd_path = data_path
         self.kdd_data = []
-        self.kdd_data_processed = []
-        self.kdd_data_reduced = []
-        self.kdd_train_data = []
-        self.kdd_test_data = []
+        self.kdd_numeric = []
+        self.kdd_binary = []
+        self.kdd_nominal = []
+        self.kdd_label_2classes = []
+        #read data from file
         self.get_data()
+        #prepare 2 classes label for "attack" and "normal"
+        self.get_2classes_labels()
 
     def get_data(self):
         col_names = ["duration","protocol_type","service","flag","src_bytes",
@@ -42,8 +45,7 @@ class IntrusionDetector:
     def get_2classes_labels(self):
         label_2class = self.kdd_data['label'].copy()
         label_2class[label_2class != 'normal.'] = 'attack.'
-        label_2class = label_2class.values.reshape((label_2class.shape[0], 1))
-        return label_2class
+        self.kdd_label_2classes = label_2class.values.reshape((label_2class.shape[0], 1))
 
     def preprocessor(self):
         nominal_features = ["protocol_type", "service", "flag"]  # [1, 2, 3]
@@ -64,62 +66,46 @@ class IntrusionDetector:
 
         #convert nominal features to numeric features
         #nominal features: ["protocol_type", "service", "flag"]
-        kdd_nominal = self.kdd_data[nominal_features].stack().astype('category').unstack()
+        self.kdd_nominal = self.kdd_data[nominal_features].stack().astype('category').unstack()
 
-        kdd_nominal_encoded = np.column_stack((kdd_nominal["protocol_type"].cat.codes,\
-                                               kdd_nominal["service"].cat.codes,\
-                                               kdd_nominal["flag"].cat.codes))
+        self.kdd_nominal = np.column_stack((self.kdd_nominal["protocol_type"].cat.codes, \
+                                               self.kdd_nominal["service"].cat.codes, \
+                                               self.kdd_nominal["flag"].cat.codes))
         #print (kdd_nominal_encoded)
-        #kdd_nominal_encoded = pd.get_dummies(kdd_nominal, columns=nominal_features)
 
-        kdd_binary = self.kdd_data[binary_features]
+        self.kdd_binary = self.kdd_data[binary_features]
 
         # Standardizing and scaling numeric features
-        kdd_num = self.kdd_data[numeric_features].astype(float)
-        kdd_num_std = StandardScaler().fit_transform(kdd_num)
+        self.kdd_numeric = self.kdd_data[numeric_features].astype(float)
+        self.kdd_numeric = StandardScaler().fit_transform(self.kdd_numeric)
 
-        #TO-DO: kdd_nominal_encoded is ignored because of memory error when fitting classifier
-        self.kdd_data_processed = np.concatenate([kdd_num_std, kdd_binary , kdd_nominal_encoded], axis=1)
-        #kdd_data_processed = np.concatenate([kdd_data_processed, kdd_nominal_encoded], axis = 1)
-        #print(kdd_data_processed.shape)
 
     def feature_reduction_PCA(self):
-        kdd_num = self.kdd_data_processed[:,:-9]
-        kdd_binary = self.kdd_data_processed[:, -9:-3]
-        kdd_nominal_encoded = self.kdd_data_processed[:, -3:]
-        #print (kdd_processed.shape)
-        #print (kdd_binary.shape)
-
         #compute Eigenvectors and Eigenvalues
-        mean_vec = np.mean(kdd_num, axis=0)
-        cov_mat = np.cov((kdd_num.T))
+        mean_vec = np.mean(self.kdd_numeric, axis=0)
+        cov_mat = np.cov((self.kdd_numeric.T))
 
         # Correlation matrix
-        cor_mat = np.corrcoef((kdd_num.T))
+        cor_mat = np.corrcoef((self.kdd_numeric.T))
         eig_vals, eig_vecs = np.linalg.eig(cor_mat)
-        #print ('\n\n eigenvectors \n %s' %eig_vecs)
-        #print ('\n\n eigenvalues \n %s' %eig_vals)
 
         # To check that the length of eig_vectors is 1
         for ev in eig_vecs:
             np.testing.assert_array_almost_equal(1.0,np.linalg.norm(ev))
-        #print ('Everything ok!')
+        #print ('eigen_vector length is 1')
 
         #to rank the eigenvalues from highest to lowest in order choose the top k eigenvectors and ignore the rest
-        # 1- Make a list of (eigenvalue, eigenvector) tuples
+        # Make a list of (eigenvalue, eigenvector) tuples
         eig_pairs = [(np.abs(eig_vals[i]), eig_vecs[:,i]) for i in range(len(eig_vals))]
 
-        # 2- Sort the (eigenvalue, eigenvector) tuples from high to low
+        # Sort and print the (eigenvalue, eigenvector) tuples from high to low
         eig_pairs.sort()
         eig_pairs.reverse()
-
-        # 3- Visually confirm that the list is correctly sorted by decreasing eigenvalues
-        #print('\n\nEigenvalues in descending order:')
         #for i in eig_pairs:
         #    print(i[0])
 
         #feature reduction
-        # just the 10 first are greater 1 and one which is close to 1 => pick 11
+        # just the 10 first items are greater 1 and one which is close to 1 => pick 11
         matrix_w = np.hstack((eig_pairs[0][1].reshape(32,1),
                               eig_pairs[1][1].reshape(32,1),
                               eig_pairs[2][1].reshape(32,1),
@@ -131,98 +117,78 @@ class IntrusionDetector:
                               eig_pairs[8][1].reshape(32,1),
                               eig_pairs[9][1].reshape(32,1),
                               eig_pairs[10][1].reshape(32,1)))
-        #print('Matrix W:\n', matrix_w)
+        # projection to new feature space
+        self.kdd_numeric = self.kdd_numeric.dot(matrix_w)
         '''
         from sklearn.decomposition import PCA as sklearnPCA
         sklearn_pca = sklearnPCA(n_components=10)
-        kdd_num_projected = sklearn_pca.fit_transform(kdd_num_std)
-        #print (kdd_num_projected)
+        self.kdd_numeric = sklearn_pca.fit_transform(self.kdd_numeric)
         '''
 
-        #projection to new feature space
-        kdd_num_projected = kdd_num.dot(matrix_w)
-        #print (kdd_num_projected.shape)
-        #self.kdd_data_reduced = np.concatenate([kdd_num_projected, kdd_binary, kdd_nominal_encoded], axis=1)
-        self.kdd_data_reduced = np.concatenate([kdd_num_projected], axis=1)
-
-        #print (self.kdd_data_reduced.shape)
-
     def bayes_classifier(self):
-        # add label to the finalized data set
-        self.kdd_data_reduced = np.concatenate([self.kdd_data_reduced, self.get_2classes_labels()], axis=1)
-        # split data to 80% for train and 20% for test
-        # shuffle is by default = True
-        self.kdd_train_data, self.kdd_test_data = train_test_split(self.kdd_data_reduced, train_size=0.8)
+        data = np.concatenate([self.kdd_numeric, self.kdd_binary, self.kdd_nominal, self.kdd_label_2classes], axis=1)
 
-        # TO-DO: Split kdd_train_data for cross-validation
-        # classifier
-        # Create a Gaussian Classifier
+        # shuffle is by default = True
+        kdd_train_data, kdd_test_data = train_test_split(data, train_size=0.8)
+
         model = GaussianNB()
         # Train the model using the training sets
-        model.fit(self.kdd_train_data[:, :-1], self.kdd_train_data[:, -1])
+        model.fit(kdd_train_data[:, :-1], kdd_train_data[:, -1])
         with open('naivebayes.pickle','wb') as f:
             pickle.dump(model,f)
 
         # Predict
-        predicts = model.predict(self.kdd_test_data[:, :-1])
+        predicts = model.predict(kdd_test_data[:, :-1])
         print ("Naive classifier:")
-        accuracy = accuracy_score(self.kdd_test_data[:, -1], predicts)
+        accuracy = accuracy_score(kdd_test_data[:, -1], predicts)
         print ("Accuracy: ",accuracy)
-        con_matrix = confusion_matrix(self.kdd_test_data[:, -1], predicts, labels=["normal.", "attack."])
+        con_matrix = confusion_matrix(kdd_test_data[:, -1], predicts, labels=["normal.", "attack."])
         print("confusion matrix:")
         print(con_matrix)
 
 
     def knn_classifier(self):
-        print('in knn')
-        self.kdd_data_reduced=np.concatenate([self.kdd_data_reduced, self.get_2classes_labels()], axis=1)
-        self.kdd_train_data, self.kdd_test_data = train_test_split(self.kdd_data_reduced, test_size=0.2)
-        clf=neighbors.KNeighborsClassifier()
-        clf.fit(self.kdd_train_data[:, :-1], self.kdd_train_data[:, -1])
+        data = np.concatenate([self.kdd_numeric, self.kdd_label_2classes], axis=1)
+        kdd_train_data, kdd_test_data = train_test_split(data, test_size=0.2)
+
+        clf = neighbors.KNeighborsClassifier()
+        clf.fit(kdd_train_data[:, :-1], kdd_train_data[:, -1])
         print('model trained')
-        predicts = clf.predict(self.kdd_test_data[:, :-1])
-        accuracy=accuracy_score(self.kdd_test_data[:, -1], predicts)
+        predicts = clf.predict(kdd_test_data[:, :-1])
+        accuracy=accuracy_score(kdd_test_data[:, -1], predicts)
         print('knn accuracy',accuracy)
 
     def svm_classifier(self):
-        self.kdd_data_reduced = np.concatenate([self.kdd_data_reduced, self.get_2classes_labels()], axis=1)
-
-        self.kdd_train_data, self.kdd_test_data = train_test_split(self.kdd_data_reduced, train_size=0.1)
+        data = np.concatenate([self.kdd_numeric, self.kdd_label_2classes], axis=1)
+        kdd_train_data, kdd_test_data = train_test_split(data, train_size=0.1)
 
         # Create SVM classification object
         model = svm.SVC(kernel='rbf', C=0.2, gamma=1)
-        model.fit(self.kdd_train_data[:, :-1], self.kdd_train_data[:, -1])
+        model.fit(kdd_train_data[:, :-1], kdd_train_data[:, -1])
         # Predict Output
-        predicts = model.predict(self.kdd_test_data[:, :-1])
+        predicts = model.predict(kdd_test_data[:, :-1])
         print("SVM classifier:")
-        accuracy = accuracy_score(self.kdd_test_data[:, -1], predicts)
+        accuracy = accuracy_score(kdd_test_data[:, -1], predicts)
         print("Accuracy: ", accuracy)
-        con_matrix = confusion_matrix(self.kdd_test_data[:, -1], predicts, labels=["normal.", "attack."])
+        con_matrix = confusion_matrix(kdd_test_data[:, -1], predicts, labels=["normal.", "attack."])
         print("confusion matrix:")
         print(con_matrix)
 
 
     def decision_tree_classifier(self):
-        self.kdd_data_reduced = np.concatenate([self.kdd_data_reduced, self.get_2classes_labels()], axis=1)
+        data = np.concatenate([self.kdd_numeric, self.kdd_label_2classes], axis=1)
 
-        self.kdd_train_data, self.kdd_test_data = train_test_split(self.kdd_data_reduced, train_size=0.8)
+        kdd_train_data, kdd_test_data = train_test_split(data, train_size=0.8)
 
         model = tree.DecisionTreeClassifier()
-        model.fit(self.kdd_train_data[:, :-1], self.kdd_train_data[:, -1])
-        predicts = model.predict(self.kdd_test_data[:, :-1])
+        model.fit(kdd_train_data[:, :-1], kdd_train_data[:, -1])
+        predicts = model.predict(kdd_test_data[:, :-1])
         print("Decision Tree classifier:")
-        accuracy = accuracy_score(self.kdd_test_data[:, -1], predicts)
+        accuracy = accuracy_score(kdd_test_data[:, -1], predicts)
         print("Accuracy: ", accuracy)
-        con_matrix = confusion_matrix(self.kdd_test_data[:, -1], predicts, labels=["normal.", "attack."])
+        con_matrix = confusion_matrix(kdd_test_data[:, -1], predicts, labels=["normal.", "attack."])
         print("confusion matrix:")
         print(con_matrix)
-
-    # def post_classification(self):
-    #     #print(len(self.kdd_train_data),len(self.kdd_test_data))
-    #     # X_train, X_test, y_train, y_test =cross_validation.train_test_split(self.kdd_train_data,self.kdd_test_data,test_size=0.2)
-    #     # #self.model.fit(self.kdd_train_data,self.kdd_test_data)
-    #     # accuracy=self.model.score(X_test,y_test)
-    #     # print("Post Classification: "+accuracy)
 
 
 def main():
@@ -237,8 +203,7 @@ def main():
     #i_detector.bayes_classifier()
     #i_detector.knn_classifier()
     i_detector.svm_classifier()
-    i_detector.decision_tree_classifier()
-    #i_detector.post_classification()
+    #i_detector.decision_tree_classifier()
 
 if __name__ == '__main__':
     main()
