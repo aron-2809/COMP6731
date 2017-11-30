@@ -153,8 +153,11 @@ class IntrusionDetector:
         data = np.concatenate([self.kdd_numeric, self.kdd_label_2classes], axis=1)
         kdd_train_data, kdd_test_data = train_test_split(data, test_size=0.2)
 
-        clf = neighbors.KNeighborsClassifier()
-        clf.fit(kdd_train_data[:, :-1], kdd_train_data[:, -1])
+        clf=pickle.load(open("knearestneighbor.pickle", "rb"))
+        # clf = neighbors.KNeighborsClassifier()
+        # clf.fit(kdd_train_data[:, :-1], kdd_train_data[:, -1])
+        # with open('knearestneighbor.pickle','wb') as f:
+        #     pickle.dump(clf,f)
         print('model trained')
         predicts = clf.predict(kdd_test_data[:, :-1])
         accuracy=accuracy_score(kdd_test_data[:, -1], predicts)
@@ -164,9 +167,13 @@ class IntrusionDetector:
         data = np.concatenate([self.kdd_numeric, self.kdd_label_2classes], axis=1)
         kdd_train_data, kdd_test_data = train_test_split(data, train_size=0.1)
 
+        #load Pickle
+        model=pickle.load(open("svm.pickle", "rb"))
         # Create SVM classification object
-        model = svm.SVC(kernel='rbf', C=0.2, gamma=1)
-        model.fit(kdd_train_data[:, :-1], kdd_train_data[:, -1])
+        # model = svm.SVC(kernel='rbf', C=0.2, gamma=1)
+        # model.fit(kdd_train_data[:, :-1], kdd_train_data[:, -1])
+        # with open('svm.pickle','wb') as f:
+        #     pickle.dump(model,f)
         # Predict Output
         predicts = model.predict(kdd_test_data[:, :-1])
         print("SVM classifier:")
@@ -182,8 +189,12 @@ class IntrusionDetector:
 
         kdd_train_data, kdd_test_data = train_test_split(data, train_size=0.8)
 
-        model = tree.DecisionTreeClassifier()
-        model.fit(kdd_train_data[:, :-1], kdd_train_data[:, -1])
+        #load Pickle
+        model=pickle.load(open("svm.pickle", "rb"))
+        # model = tree.DecisionTreeClassifier()
+        # model.fit(kdd_train_data[:, :-1], kdd_train_data[:, -1])
+        # with open('decision_tree.pickle','wb') as f:
+        #      pickle.dump(model,f)
         predicts = model.predict(kdd_test_data[:, :-1])
         print("Decision Tree classifier:")
         accuracy = accuracy_score(kdd_test_data[:, -1], predicts)
@@ -203,9 +214,9 @@ def main():
 
     i_detector.feature_reduction_PCA()
     #i_detector.bayes_classifier()
-    #i_detector.knn_classifier()
-    i_detector.svm_classifier()
-    #i_detector.decision_tree_classifier()
+    # i_detector.knn_classifier()
+    # i_detector.svm_classifier()
+    i_detector.decision_tree_classifier()
 
 if __name__ == '__main__':
     main()
