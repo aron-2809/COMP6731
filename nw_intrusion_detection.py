@@ -7,6 +7,7 @@ from sklearn.naive_bayes import GaussianNB
 from sklearn.preprocessing import StandardScaler  # scipy package
 from sklearn.metrics import accuracy_score
 from sklearn import cross_validation, neighbors
+from sklearn.metrics import confusion_matrix
 from sklearn import svm
 import pickle
 
@@ -161,7 +162,11 @@ class IntrusionDetector:
 
         # Predict
         predicts = model.predict(self.kdd_test_data[:, :-1])
-        return (accuracy_score(self.kdd_test_data[:, -1], predicts))
+        print ("Naive classifier:")
+        accuracy = accuracy_score(self.kdd_test_data[:, -1], predicts)
+        print ("Accuracy: ",accuracy)
+        con_matrix = confusion_matrix(self.kdd_train_data[:, -1], predicts, labels=["normal.", "attack."])
+        print("confusion matrix:", con_matrix)
         '''# Create SVM classification object
         model = svm.SVC(kernel='linear', C=1, gamma=1)
         # there is various option associated with it, like changing kernel, gamma and C value. Will discuss more # about it in next section.Train the model using the training sets and check score
@@ -204,9 +209,6 @@ def main():
 
     i_detector.feature_reduction_PCA()
     i_detector.knearestneighbor()
-    # accuracy = i_detector.classify()
-    # print("accuracy of classifying 20% test-data is : ")
-    # print(accuracy)
     #i_detector.post_classification()
 
 if __name__ == '__main__':
