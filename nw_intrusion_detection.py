@@ -23,8 +23,7 @@ class IntrusionDetector:
         self.kdd_label_2classes = []
         #read data from file
         self.get_data()
-        #prepare 2 classes label for "attack" and "normal"
-        self.get_2classes_labels()
+
 
     def get_data(self):
         col_names = ["duration","protocol_type","service","flag","src_bytes",
@@ -48,6 +47,9 @@ class IntrusionDetector:
         self.kdd_label_2classes = label_2class.values.reshape((label_2class.shape[0], 1))
 
     def preprocessor(self):
+        # prepare 2 classes label for "attack" and "normal"
+        self.get_2classes_labels()
+
         nominal_features = ["protocol_type", "service", "flag"]  # [1, 2, 3]
         binary_features = ["dst_bytes", "num_failed_logins", "num_compromised",\
                            "root_shell", "num_outbound_cmds", "is_host_login"]  # [6, 11, 13, 14, 20, 21]
