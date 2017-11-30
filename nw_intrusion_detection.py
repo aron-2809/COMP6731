@@ -86,8 +86,6 @@ class IntrusionDetector:
         kdd_num = self.kdd_data_processed[:,:-9]
         kdd_binary = self.kdd_data_processed[:, -9:-3]
         kdd_nominal_encoded = self.kdd_data_processed[:, -3:]
-        #print (kdd_processed.shape)
-        #print (kdd_binary.shape)
 
         #compute Eigenvectors and Eigenvalues
         mean_vec = np.mean(kdd_num, axis=0)
@@ -96,24 +94,18 @@ class IntrusionDetector:
         # Correlation matrix
         cor_mat = np.corrcoef((kdd_num.T))
         eig_vals, eig_vecs = np.linalg.eig(cor_mat)
-        #print ('\n\n eigenvectors \n %s' %eig_vecs)
-        #print ('\n\n eigenvalues \n %s' %eig_vals)
 
         # To check that the length of eig_vectors is 1
         for ev in eig_vecs:
             np.testing.assert_array_almost_equal(1.0,np.linalg.norm(ev))
-        #print ('Everything ok!')
 
         #to rank the eigenvalues from highest to lowest in order choose the top k eigenvectors and ignore the rest
-        # 1- Make a list of (eigenvalue, eigenvector) tuples
+        #Make a list of (eigenvalue, eigenvector) tuples
         eig_pairs = [(np.abs(eig_vals[i]), eig_vecs[:,i]) for i in range(len(eig_vals))]
 
-        # 2- Sort the (eigenvalue, eigenvector) tuples from high to low
+        # Sort and print the (eigenvalue, eigenvector) tuples from high to low
         eig_pairs.sort()
         eig_pairs.reverse()
-
-        # 3- Visually confirm that the list is correctly sorted by decreasing eigenvalues
-        #print('\n\nEigenvalues in descending order:')
         #for i in eig_pairs:
         #    print(i[0])
 
@@ -141,7 +133,8 @@ class IntrusionDetector:
         #projection to new feature space
         kdd_num_projected = kdd_num.dot(matrix_w)
         #print (kdd_num_projected.shape)
-        self.kdd_data_reduced = np.concatenate([kdd_num_projected, kdd_binary, kdd_nominal_encoded], axis=1)
+        # self.kdd_data_reduced = np.concatenate([kdd_num_projected, kdd_binary, kdd_nominal_encoded], axis=1)
+        self.kdd_data_reduced = np.concatenate([kdd_num_projected], axis=1)
         #print (self.kdd_data_reduced.shape)
 
     def classify(self):
@@ -182,8 +175,7 @@ class IntrusionDetector:
         self.kdd_data_reduced=np.concatenate([self.kdd_data_reduced, self.get_2classes_labels()], axis=1)
         self.kdd_train_data, self.kdd_test_data = train_test_split(self.kdd_data_reduced, test_size=0.2)
         clf=neighbors.KNeighborsClassifier()
-        clf.fit(self.kdd_train_data)
-        print('model trained')
+        clf.fit(self.kdd_train_data[:, :-1], self.kdd_train_data[:, -1])
         predicts = clf.predict(self.kdd_test_data[:, :-1])
         accuracy=accuracy_score(self.kdd_test_data[:, -1], predicts)
         print('knn accuracy',accuracy)
