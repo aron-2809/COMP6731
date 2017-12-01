@@ -139,8 +139,8 @@ class IntrusionDetector:
 
         # model = GaussianNB()
         # Train the model using the training sets
-        # model.fit(kdd_train_data[:, :-1], kdd_train_data[:, -1])
-        # with open('naivebayes.pickle','wb') as f:
+        #model.fit(kdd_train_data[:, :-1], kdd_train_data[:, -1])
+        #with open('naivebayes.pickle','wb') as f:
         #     pickle.dump(model,f)
 
         # Predict
@@ -193,7 +193,9 @@ class IntrusionDetector:
 
 
     def decision_tree_classifier(self):
-        data = np.concatenate([self.kdd_numeric, self.kdd_label_2classes], axis=1)
+        #data = np.concatenate([self.kdd_numeric, self.kdd_label_2classes], axis=1)
+        data = np.concatenate([self.kdd_numeric, self.kdd_binary, self.kdd_nominal, self.kdd_label_2classes], axis=1)
+
 
         kdd_train_data, kdd_test_data = train_test_split(data, train_size=0.8)
 
@@ -217,12 +219,28 @@ def main():
 
     i_detector = IntrusionDetector(kdd_data_path)
     i_detector.preprocessor()
-
     i_detector.feature_reduction_PCA()
-    i_detector.bayes_classifier()
-    # i_detector.knn_classifier()
-    #i_detector.svm_classifier()
-    # i_detector.decision_tree_classifier()
+
+    while (True):
+        print("\n\n")
+        print("1. Naive Bayes Classifier")
+        print("2. SVM Classifier")
+        print("3. KNN Classifier")
+        print("4. Decision Tree Classifier")
+        print("5. Quit")
+        option = input("Please enter a value:")
+
+        if (option == "1"):
+             i_detector.bayes_classifier()
+        elif option == "2":
+             i_detector.svm_classifier()
+        elif option == "3":
+             i_detector.knn_classifier()
+        elif option == "4":
+             i_detector.decision_tree_classifier()
+        elif option == "5":
+             break
+
 
 if __name__ == '__main__':
     main()
